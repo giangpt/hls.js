@@ -90,7 +90,8 @@ class Hls {
           abrEwmaSlowVoD: 15,
           abrEwmaDefaultEstimate: 5e5, // 500 kbps
           abrBandWidthFactor : 0.8,
-          abrBandWidthUpFactor : 0.7
+          abrBandWidthUpFactor : 0.7,
+          abrInitFragmentLoad: 10 // add by tunggiang.pham
         };
     }
     return Hls.defaultConfig;

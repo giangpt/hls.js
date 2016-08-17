@@ -124,7 +124,9 @@ class StreamController extends EventHandler {
       case State.ERROR:
         //don't do anything in error state to avoid breaking further ...
       case State.PAUSED:
-        //don't do anything in paused state either ...
+        // add by tunggiang.pham
+        this.state = State.WAITING_LEVEL;
+        //don't do anything in error state to avoid breaking further ...
         break;
       case State.STARTING:
         // determine load level
@@ -134,6 +136,8 @@ class StreamController extends EventHandler {
           startLevel = 0;
           this.fragBitrateTest = true;
         }
+        // add by tunggiang.pham
+        hls.config.fragmentLoaded = 0;
         // set new level to playlist loader : this will trigger start level load
         // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
         this.level = hls.nextLoadLevel = startLevel;
@@ -149,16 +153,30 @@ class StreamController extends EventHandler {
           (this.startFragRequested || !config.startFragPrefetch)) {
           break;
         }
+        // add by tunggiang.pham
+        hls.config.reload = false;
         // determine next candidate fragment to be loaded, based on current position and
         //  end of buffer position
         //  ensure 60s of buffer upfront
         // if we have not yet loaded any fragment, start loading from start position
         if (this.loadedmetadata) {
           pos = media.currentTime;
+          // == add by tunggiang.pham ==============
+          if (media.currentTime > this.nextLoadPosition) {
+            hls.config.reload = true;
+          }
+          // =======================================
         } else {
           pos = this.nextLoadPosition;
         }
-        level = hls.nextLoadLevel;
+
+        // == add by tunggiang.pham ==============
+        if(hls.autoLevelEnabled && hls.config.fragmentLoaded <= hls.config.abrInitFragmentLoad) {
+          level = hls.startLevel;
+        } else {
+          level = hls.nextLoadLevel;
+        }
+        // =======================================
         var bufferInfo = BufferHelper.bufferInfo(media,pos,config.maxBufferHole),
             bufferLen = bufferInfo.len,
             bufferEnd = bufferInfo.end,
@@ -171,6 +189,11 @@ class StreamController extends EventHandler {
         } else {
           maxBufLen = config.maxBufferLength;
         }
+        // == add by tunggiang.pham ==============
+        if(hls.config.reload && bufferLen >= maxBufLen) {
+          maxBufLen = bufferLen + 1;
+        }
+        // =======================================
         // if buffer length is less than maxBufLen try to load a new fragment
         if (bufferLen < maxBufLen) {
           // set next load level : this will trigger a playlist load if needed
@@ -216,6 +239,12 @@ class StreamController extends EventHandler {
             // level 1 loaded [182580162,182580168] <============= here we should have bufferEnd > end. in that case break to avoid reloading 182580168
             // level 1 loaded [182580164,182580171]
             //
+            // == add by tunggiang.pham ==============
+            if(hls.config.reload && bufferEnd > end) {
+              bufferEnd = end - 1;
+              media.currentTime = start;
+            }
+            // =======================================
             if (levelDetails.PTSKnown && bufferEnd > end) {
               break;
             }
@@ -383,9 +412,6 @@ class StreamController extends EventHandler {
     // check/update current fragment
     this._checkFragmentChanged();
   }
-
-
-
 
   getBufferRange(position) {
     var i, range,

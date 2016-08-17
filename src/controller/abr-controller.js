@@ -72,9 +72,15 @@ class AbrController extends EventHandler {
       this.clearTimer();
       return;
     }
+
     /* only monitor frag retrieval time if
-    (video not paused OR first fragment being loaded(ready state === HAVE_NOTHING = 0)) AND autoswitching enabled AND not lowest level (=> means that we have several levels) */
-    if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level) {
+     (video not paused OR first fragment being loaded(ready state === HAVE_NOTHING = 0))
+     AND autoswitching enabled
+     AND not lowest level (=> means that we have several levels)
+     == add by tunggiang.pham ==============
+     AND (hls.config.initLoad not set OR hls.config.fragmentLoaded > hls.config.initLoad)
+     */
+    if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level && (hls.config.abrInitFragmentLoad <= 0 || hls.config.fragmentLoaded >= hls.config.abrInitFragmentLoad)) {
       let requestDelay = performance.now() - frag.trequest;
       // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
       if (requestDelay > (500 * frag.duration)) {

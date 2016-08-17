@@ -32,6 +32,13 @@ class FragmentLoader extends EventHandler {
   loadsuccess(event, stats) {
     var payload = event.currentTarget.response;
     stats.length = payload.byteLength;
+    // == add by tunggiang.pham ==============
+    if(this.hls.config.fragmentLoaded !== undefined) {
+      this.hls.config.fragmentLoaded++;
+    } else {
+      this.hls.config.fragmentLoaded = 1;
+    }
+    // =======================================
     // detach fragment loader on load success
     this.frag.loader = undefined;
     this.hls.trigger(Event.FRAG_LOADED, {payload: payload, frag: this.frag, stats: stats});
