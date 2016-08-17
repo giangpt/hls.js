@@ -192,6 +192,11 @@ class AbrController extends EventHandler {
 
     let avgbw = this.bwEstimator ? this.bwEstimator.getEstimate() : config.abrEwmaDefaultEstimate,
         adjustedbw;
+    // == add by tunggiang.pham ==============
+    if (maxAutoLevel > 0) {
+      maxAutoLevel--;
+    }
+    // =======================================
     // follow algorithm captured from stagefright :
     // https://android.googlesource.com/platform/frameworks/av/+/master/media/libstagefright/httplive/LiveSession.cpp
     // Pick the highest bandwidth stream below or equal to estimated bandwidth.
