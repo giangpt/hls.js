@@ -6085,14 +6085,17 @@ var Hls = function () {
           timelineController: _timelineController2.default,
           enableCEA708Captions: true,
           enableMP2TPassThrough: false,
+          // == add by tunggiang.pham ==============
+          fragLoadingIgnoreCached: true,
+          abrInitFragmentLoad: 10,
+          // =======================================
           abrEwmaFastLive: 5,
           abrEwmaSlowLive: 9,
           abrEwmaFastVoD: 4,
           abrEwmaSlowVoD: 15,
           abrEwmaDefaultEstimate: 5e5, // 500 kbps
           abrBandWidthFactor: 0.8,
-          abrBandWidthUpFactor: 0.7,
-          abrInitFragmentLoad: 10 // add by tunggiang.pham
+          abrBandWidthUpFactor: 0.7
         };
       }
       return Hls.defaultConfig;
@@ -6441,7 +6444,19 @@ var FragmentLoader = function (_EventHandler) {
       this.frag.loaded = 0;
       var config = this.hls.config;
       frag.loader = this.loader = typeof config.fLoader !== 'undefined' ? new config.fLoader(config) : new config.loader(config);
-      this.loader.load(frag.url, 'arraybuffer', this.loadsuccess.bind(this), this.loaderror.bind(this), this.loadtimeout.bind(this), config.fragLoadingTimeOut, 1, 0, this.loadprogress.bind(this), frag);
+      var fragUrl = frag.url;
+      // == add by tunggiang.pham ==============
+      if (config.fragLoadingIgnoreCached !== undefined) {
+        if (config.fragLoadingIgnoreCached === true) {
+          if (/\?/.test(frag.url)) {
+            fragUrl += '&_time=' + Date.now();
+          } else {
+            fragUrl += '?_time=' + Date.now();
+          }
+        }
+      }
+      // =======================================
+      this.loader.load(fragUrl, 'arraybuffer', this.loadsuccess.bind(this), this.loaderror.bind(this), this.loadtimeout.bind(this), config.fragLoadingTimeOut, 1, 0, this.loadprogress.bind(this), frag);
     }
   }, {
     key: 'loadsuccess',
