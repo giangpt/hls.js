@@ -26,7 +26,19 @@ class FragmentLoader extends EventHandler {
     this.frag.loaded = 0;
     var config = this.hls.config;
     frag.loader = this.loader = typeof(config.fLoader) !== 'undefined' ? new config.fLoader(config) : new config.loader(config);
-    this.loader.load(frag.url, 'arraybuffer', this.loadsuccess.bind(this), this.loaderror.bind(this), this.loadtimeout.bind(this), config.fragLoadingTimeOut, 1, 0, this.loadprogress.bind(this), frag);
+    var frag_url = frag.url;
+    // == add by tunggiang.pham ==============
+    if(typeof config.fragLoadingIgnoreCached !== "undefined") {
+      if(config.fragLoadingIgnoreCached === true) {
+        if(/\?/.test(frag.url)) {
+          frag_url += '&_time=' + Date.now();
+        } else {
+          frag_url += '?_time=' + Date.now();
+        }
+      }
+    }
+    // =======================================
+    this.loader.load(frag_url, 'arraybuffer', this.loadsuccess.bind(this), this.loaderror.bind(this), this.loadtimeout.bind(this), config.fragLoadingTimeOut, 1, 0, this.loadprogress.bind(this), frag);
   }
 
   loadsuccess(event, stats) {
