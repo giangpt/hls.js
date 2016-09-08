@@ -1787,6 +1787,8 @@ var StreamController = function (_EventHandler) {
             this.startLevel = 0;
             this.fragBitrateTest = true;
           }
+          // add by tunggiang.pham
+          hls.config.fragmentLoaded = 0;
           // set new level to playlist loader : this will trigger start level load
           this.level = hls.nextLoadLevel = this.startLevel;
           this.state = State.WAITING_LEVEL;
@@ -1862,7 +1864,7 @@ var StreamController = function (_EventHandler) {
 
       // determine next load level
       var level = void 0;
-      if (this.startFragRequested === false) {
+      if (this.startFragRequested === false || hls.autoLevelEnabled && hls.config.fragmentLoaded <= hls.config.abrInitFragmentLoad) {
         level = this.startLevel;
       } else {
         // we are not at playback start, get next load level from level Controller
