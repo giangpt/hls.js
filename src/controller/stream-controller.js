@@ -122,7 +122,9 @@ class StreamController extends EventHandler {
     //logger.log(this.state);
     switch(this.state) {
       case State.ERROR:
+        hls.nextLevel(0);
         //don't do anything in error state to avoid breaking further ...
+        break;
       case State.PAUSED:
         // add by tunggiang.pham
         this.state = State.WAITING_LEVEL;

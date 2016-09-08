@@ -85,7 +85,7 @@ class Hls {
             enableCEA708Captions: true,
             enableMP2TPassThrough : false,
             // == add by tunggiang.pham ==============
-            fragLoadingIgnoreCached: true,
+            fragLoadingIgnoreCached: false,
             abrInitFragmentLoad: 10,
             // =======================================
             abrEwmaFastLive: 5,
