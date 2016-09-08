@@ -1,6 +1,6 @@
 /*
  * Buffer Controller
- */
+*/
 
 import Event from '../events';
 import EventHandler from '../event-handler';
@@ -18,7 +18,14 @@ class BufferController extends EventHandler {
       Event.BUFFER_APPENDING,
       Event.BUFFER_CODECS,
       Event.BUFFER_EOS,
-      Event.BUFFER_FLUSHING);
+      Event.BUFFER_FLUSHING,
+      Event.LEVEL_UPDATED);
+
+    // the value that we have set mediasource.duration to
+    // (the actual duration may be tweaked slighly by the browser)
+    this._msDuration = null;
+    // the value that we want to set mediaSource.duration to
+    this._levelDuration = null;
 
     // Source Buffer listeners
     this.onsbue = this.onSBUpdateEnd.bind(this);
@@ -47,7 +54,6 @@ class BufferController extends EventHandler {
   }
 
   onMediaDetaching() {
-    logger.log('media source detaching');
     var ms = this.mediaSource;
     if (ms) {
       if (ms.readyState === 'open') {
@@ -75,7 +81,7 @@ class BufferController extends EventHandler {
       this.mediaSource = null;
       this.media = null;
       this.pendingTracks = null;
-      this.sourceBuffer = {};
+      this.sourceBuffer = null;
     }
     this.onmso = this.onmse = this.onmsc = null;
     this.hls.trigger(Event.MEDIA_DETACHED);
@@ -130,16 +136,18 @@ class BufferController extends EventHandler {
 
   onBufferReset() {
     var sourceBuffer = this.sourceBuffer;
-    for(var type in sourceBuffer) {
-      var sb = sourceBuffer[type];
-      try {
-        this.mediaSource.removeSourceBuffer(sb);
-        sb.removeEventListener('updateend', this.onsbue);
-        sb.removeEventListener('error', this.onsbe);
-      } catch(err) {
+    if (sourceBuffer) {
+      for(var type in sourceBuffer) {
+        var sb = sourceBuffer[type];
+        try {
+          this.mediaSource.removeSourceBuffer(sb);
+          sb.removeEventListener('updateend', this.onsbue);
+          sb.removeEventListener('error', this.onsbe);
+        } catch(err) {
+        }
       }
+      this.sourceBuffer = null;
     }
-    this.sourceBuffer = {};
     this.flushRange = [];
     this.appended = 0;
   }
@@ -153,24 +161,19 @@ class BufferController extends EventHandler {
       return;
     }
 
-    let sourceBuffer = this.sourceBuffer;
-
-    for (let trackName in tracks) {
-      if(!sourceBuffer[trackName]) {
+    if (!this.sourceBuffer) {
+      let sourceBuffer = {};
+      for (let trackName in tracks) {
         let track = tracks[trackName];
         // use levelCodec as first priority
         let codec = track.levelCodec || track.codec;
         let mimeType = `${track.container};codecs=${codec}`;
         logger.log(`creating sourceBuffer with mimeType:${mimeType}`);
-        try {
-          let sb = sourceBuffer[trackName] = mediaSource.addSourceBuffer(mimeType);
-          sb.addEventListener('updateend', this.onsbue);
-          sb.addEventListener('error', this.onsbe);
-        } catch(err) {
-          logger.error(`error while trying to add sourceBuffer:${err.message}`);
-          this.hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_ADD_CODEC_ERROR, fatal: false, err: err, mimeType : mimeType});
-        }
+        let sb = sourceBuffer[trackName] = mediaSource.addSourceBuffer(mimeType);
+        sb.addEventListener('updateend', this.onsbue);
+        sb.addEventListener('error', this.onsbe);
       }
+      this.sourceBuffer = sourceBuffer;
     }
   }
 
@@ -213,6 +216,47 @@ class BufferController extends EventHandler {
     this.doFlush();
   }
 
+  onLevelUpdated(event) {
+    let details = event.details;
+    if (details.fragments.length === 0) {
+      return;
+    }
+    this._levelDuration = details.totalduration + details.fragments[0].start;
+    this.updateMediaElementDuration();
+  }
+
+  // https://github.com/dailymotion/hls.js/issues/355
+  updateMediaElementDuration() {
+    if (this._levelDuration === null) {
+      return;
+    }
+    let media = this.media,
+        mediaSource = this.mediaSource,
+        sourceBuffer = this.sourceBuffer;
+    if (!media || !mediaSource || !sourceBuffer || media.readyState === 0 || mediaSource.readyState !== 'open') {
+      return;
+    }
+    for (let type in sourceBuffer) {
+      if (sourceBuffer[type].updating) {
+        // can't set duration whilst a buffer is updating
+        return;
+      }
+    }
+    if (this._msDuration === null) {
+      // initialise to the value that the media source is reporting
+      this._msDuration = mediaSource.duration;
+    }
+    // this._levelDuration was the last value we set.
+    // not using mediaSource.duration as the browser may tweak this value
+    // only update mediasource duration if its value increase, this is to avoid
+    // flushing already buffered portion when switching between quality level, as they
+    if (this._levelDuration > this._msDuration) {
+      logger.log(`Updating mediasource duration to ${this._levelDuration}`);
+      mediaSource.duration = this._levelDuration;
+      this._msDuration = this._levelDuration;
+    }
+  }
+
   doFlush() {
     // loop through all buffer ranges to flush
     while(this.flushRange.length) {
@@ -235,8 +279,10 @@ class BufferController extends EventHandler {
       // let's recompute this.appended, which is used to avoid flush looping
       var appended = 0;
       var sourceBuffer = this.sourceBuffer;
-      for (var type in sourceBuffer) {
-        appended += sourceBuffer[type].buffered.length;
+      if (sourceBuffer) {
+        for (var type in sourceBuffer) {
+          appended += sourceBuffer[type].buffered.length;
+        }
       }
       this.appended = appended;
       this.hls.trigger(Event.BUFFER_FLUSHED);
@@ -261,16 +307,9 @@ class BufferController extends EventHandler {
         var segment = segments.shift();
         try {
           //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
-          if(sourceBuffer[segment.type]) {
-            sourceBuffer[segment.type].appendBuffer(segment.data);
-            this.appendError = 0;
-            this.appended++;
-          } else {
-            // in case we don't have any source buffer matching with this segment type,
-            // it means that Mediasource fails to create sourcebuffer
-            // discard this segment, and trigger update end
-            this.onSBUpdateEnd();
-          }
+          sourceBuffer[segment.type].appendBuffer(segment.data);
+          this.appendError = 0;
+          this.appended++;
         } catch(err) {
           // in case any error occured while appending, put back segment in segments table
           logger.error(`error while trying to append buffer:${err.message}`);
@@ -285,8 +324,8 @@ class BufferController extends EventHandler {
             event.details = ErrorDetails.BUFFER_APPEND_ERROR;
             event.frag = this.fragCurrent;
             /* with UHD content, we could get loop of quota exceeded error until
-             browser is able to evict some data from sourcebuffer. retrying help recovering this
-             */
+              browser is able to evict some data from sourcebuffer. retrying help recovering this
+            */
             if (this.appendError > hls.config.appendErrorMaxRetry) {
               logger.log(`fail ${hls.config.appendErrorMaxRetry} times to append segment in sourceBuffer`);
               segments = [];
@@ -300,9 +339,10 @@ class BufferController extends EventHandler {
           } else {
             // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
             // let's stop appending any segments, and report BUFFER_FULL_ERROR error
-            segments = [];
+            this.segments = [];
             event.details = ErrorDetails.BUFFER_FULL_ERROR;
             hls.trigger(Event.ERROR,event);
+            return;
           }
         }
       }
@@ -310,10 +350,10 @@ class BufferController extends EventHandler {
   }
 
   /*
-   flush specified buffered range,
-   return true once range has been flushed.
-   as sourceBuffer.remove() is asynchronous, flushBuffer will be retriggered on sourceBuffer update end
-   */
+    flush specified buffered range,
+    return true once range has been flushed.
+    as sourceBuffer.remove() is asynchronous, flushBuffer will be retriggered on sourceBuffer update end
+  */
   flushBuffer(startOffset, endOffset) {
     var sb, i, bufStart, bufEnd, flushStart, flushEnd;
     //logger.log('flushBuffer,pos/start/end: ' + this.media.currentTime + '/' + startOffset + '/' + endOffset);
@@ -334,10 +374,10 @@ class BufferController extends EventHandler {
               flushEnd = Math.min(bufEnd, endOffset);
             }
             /* sometimes sourcebuffer.remove() does not flush
-             the exact expected time range.
-             to avoid rounding issues/infinite loop,
-             only flush buffer range of length greater than 500ms.
-             */
+               the exact expected time range.
+               to avoid rounding issues/infinite loop,
+               only flush buffer range of length greater than 500ms.
+            */
             if (Math.min(flushEnd,bufEnd) - flushStart > 0.5 ) {
               this.flushBufferCounter++;
               logger.log(`flush ${type} [${flushStart},${flushEnd}], of [${bufStart},${bufEnd}], pos:${this.media.currentTime}`);
