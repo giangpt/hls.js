@@ -164,6 +164,29 @@ class StreamController extends EventHandler {
           // == add by tunggiang.pham ==============
           if (media.currentTime > this.nextLoadPosition) {
             hls.config.reload = true;
+
+            var container = this.config.player.core.getCurrentContainer();
+            // var playback = this.config.player.core.getCurrentPlayback();
+            // if(playback !== undefined) {
+            //   playback.pause();
+            //   playback._stopped = true;
+            //   this.captureVideo(container);
+            //   playback.el.currentTime = start;
+            //   playback._stopPlayheadMovingChecks();
+            //   playback._handleBufferingEvents();
+            //   // playback.trigger(_events2.default.PLAYBACK_STOP);
+            //   playback.play();
+            //
+            //   break;
+            // } else
+            if(container !== undefined) {
+              container.pause();
+              this.captureVideo(container);
+              container.stop();
+              container.play();
+
+              break;
+            }
           }
           // =======================================
         } else {
@@ -240,10 +263,10 @@ class StreamController extends EventHandler {
             // level 1 loaded [182580164,182580171]
             //
             // == add by tunggiang.pham ==============
-            if(hls.config.reload && bufferEnd > end) {
-              bufferEnd = end - 1;
-              media.currentTime = start;
-            }
+            // if(hls.config.reload && bufferEnd > end) {
+            //   bufferEnd = end - 1;
+            //   media.currentTime = start;
+            // }
             // =======================================
             if (levelDetails.PTSKnown && bufferEnd > end) {
               break;
@@ -407,10 +430,33 @@ class StreamController extends EventHandler {
       default:
         break;
     }
-    // check buffer
-    this._checkBuffer();
-    // check/update current fragment
-    this._checkFragmentChanged();
+
+    if(!hls.config.reload) {
+      // check buffer
+      this._checkBuffer();
+      // check/update current fragment
+      this._checkFragmentChanged();
+    }
+  }
+
+  captureVideo(container){
+    if(container) {
+      var _poster = container.getPlugin('poster');
+      if (_poster) {
+        var canvas = document.createElement('canvas');
+        canvas.width  = this.media.videoWidth;
+        canvas.height = this.media.videoHeight;
+        canvas.getContext('2d').drawImage(this.media, 0, 0, canvas.width, canvas.height);
+
+        _poster.$el.css({
+          'background' : 'transparent url("' + canvas.toDataURL('image/png') + '") no-repeat 0 0',
+          '-webkit-background-size' : 'cover',
+          '-moz-background-size' : 'cover',
+          '-o-background-size' : 'cover',
+          'background-size' : 'cover'
+        });
+      }
+    }
   }
 
   getBufferRange(position) {
