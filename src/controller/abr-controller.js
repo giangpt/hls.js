@@ -80,7 +80,7 @@ class AbrController extends EventHandler {
      == add by tunggiang.pham ==============
      AND (hls.config.initLoad not set OR hls.config.fragmentLoaded > hls.config.initLoad)
      */
-    if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level && (hls.config.abrInitFragmentLoad <= 0 || hls.config.fragmentLoaded >= hls.config.abrInitFragmentLoad)) {
+    if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level !== undefined && (hls.config.abrInitFragmentLoad <= 0 || hls.config.fragmentLoaded >= hls.config.abrInitFragmentLoad)) {
       let requestDelay = performance.now() - frag.trequest;
       // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
       if (requestDelay > (500 * frag.duration)) {

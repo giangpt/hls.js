@@ -164,6 +164,16 @@ class StreamController extends EventHandler {
           // == add by tunggiang.pham ==============
           if (media.currentTime > this.nextLoadPosition) {
             hls.config.reload = true;
+
+            var container = this.config.player.core.getCurrentContainer();
+            if(container !== undefined) {
+              container.pause();
+              // this.setPoster(container);
+              container.stop();
+              container.play();
+
+              break;
+            }
           }
           // =======================================
         } else {
@@ -244,17 +254,17 @@ class StreamController extends EventHandler {
             //   bufferEnd = end - 1;
             //   media.currentTime = start;
             // }
-            if(bufferEnd > end) {
-              var container = this.config.player.core.getCurrentContainer();
-              if(container !== undefined) {
-                container.pause();
-                // this.setPoster(container);
-                container.stop();
-                container.play();
-
-                break;
-              }
-            }
+            // if(bufferEnd > end) {
+            //   var container = this.config.player.core.getCurrentContainer();
+            //   if(container !== undefined) {
+            //     container.pause();
+            //     // this.setPoster(container);
+            //     container.stop();
+            //     container.play();
+            //
+            //     break;
+            //   }
+            // }
             // =======================================
             if (levelDetails.PTSKnown && bufferEnd > end) {
               break;

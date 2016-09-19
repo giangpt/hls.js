@@ -491,7 +491,7 @@ var AbrController = function (_EventHandler) {
        == add by tunggiang.pham ==============
        AND (hls.config.initLoad not set OR hls.config.fragmentLoaded > hls.config.initLoad)
        */
-      if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level && (hls.config.abrInitFragmentLoad <= 0 || hls.config.fragmentLoaded >= hls.config.abrInitFragmentLoad)) {
+      if (v && (!v.paused || !v.readyState) && frag.autoLevel && frag.level !== undefined && (hls.config.abrInitFragmentLoad <= 0 || hls.config.fragmentLoaded >= hls.config.abrInitFragmentLoad)) {
         var requestDelay = performance.now() - frag.trequest;
         // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
         if (requestDelay > 500 * frag.duration) {
@@ -1868,6 +1868,16 @@ var StreamController = function (_EventHandler) {
             // == add by tunggiang.pham ==============
             if (media.currentTime > this.nextLoadPosition) {
               hls.config.reload = true;
+
+              var container = this.config.player.core.getCurrentContainer();
+              if (container !== undefined) {
+                container.pause();
+                // this.setPoster(container);
+                container.stop();
+                container.play();
+
+                break;
+              }
             }
             // =======================================
           } else {
@@ -1948,17 +1958,17 @@ var StreamController = function (_EventHandler) {
               //   bufferEnd = end - 1;
               //   media.currentTime = start;
               // }
-              if (bufferEnd > end) {
-                var container = this.config.player.core.getCurrentContainer();
-                if (container !== undefined) {
-                  container.pause();
-                  // this.setPoster(container);
-                  container.stop();
-                  container.play();
-
-                  break;
-                }
-              }
+              // if(bufferEnd > end) {
+              //   var container = this.config.player.core.getCurrentContainer();
+              //   if(container !== undefined) {
+              //     container.pause();
+              //     // this.setPoster(container);
+              //     container.stop();
+              //     container.play();
+              //
+              //     break;
+              //   }
+              // }
               // =======================================
               if (levelDetails.PTSKnown && bufferEnd > end) {
                 break;
